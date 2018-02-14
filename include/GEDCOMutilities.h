@@ -7,7 +7,6 @@
 typedef struct arrayList {
 	char ** allLines;
 	int size;
-	char lineTerminator[2];
 } arrayList;
 
 typedef struct tagList {

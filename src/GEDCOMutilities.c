@@ -52,16 +52,7 @@ arrayList initializeArray(FILE * inFile) {
 		size++;
 		a.allLines = realloc(a.allLines, sizeof(char*) * (size + 1));
 	}
-	
-	for (int i = 0; i < strlen(temp); i ++) {
-		if (temp[i] == '\r' && temp[i+1] == '\n') {
-			strcpy(a.lineTerminator, "\r\n");
-		}
-		else if (temp[i] == '\n') {
-			strcpy(a.lineTerminator, "\n");
-		}
-	}
-	
+		
 	a.size = size;
 	
 	return a;
@@ -208,10 +199,18 @@ tagList * initializeTags(arrayList a, int * arraySize) {
 GEDCOMerror checkForError(tagList * arr, int size) {
 	
 	//All header requirements!
+	bool headerCheck = true;
 	bool submitterCheck = false;
 	bool sourceCheck = false;
 	bool charCheck = false;
 	bool versCheck = false;
+	bool gedcCheck = false;
+	bool mainSubmitter = false;
+	
+	int endOfHeader = 0;
+	
+	int tempLevel = 0;
+	int currentLevel = 0;
 	
 	
 	if (arr == NULL) {
@@ -219,11 +218,11 @@ GEDCOMerror checkForError(tagList * arr, int size) {
 	}
 	
 	if (strcmp(arr[0].tag, "HEAD") != 0) {
-		return createError(INV_HEADER, -1);
+		return createError(INV_GEDCOM, -1);
 	}
 	
 	for (int i = 0; i < size; i ++) {
-			
+					
 		if (arr[i].length > 255) {
 			//add check if error is in header or not!
 			return createError(INV_RECORD, i + 1);
@@ -268,17 +267,64 @@ GEDCOMerror checkForError(tagList * arr, int size) {
 			return createError(INV_RECORD, i + 1);
 		}
 		
-		if ((strcmp(arr[i].tag, "INDI") == 0	|| strcmp(arr[i].tag, "FAM") == 0 || strcmp(arr[i].tag, "SUBM") == 0 || strcmp(arr[i].tag, "TRLR") == 0) && strtol(arr[i].level, NULL, 10) != 0) {
+		if ((strcmp(arr[i].tag, "INDI") == 0	|| strcmp(arr[i].tag, "FAM") == 0 || strcmp(arr[i].tag, "TRLR") == 0) && strtol(arr[i].level, NULL, 10) != 0) {
 			return createError(INV_RECORD, i + 1);
 		}
 		
 		if ((strcmp(arr[i].tag, "HEAD") == 0) && strtol(arr[i].level, NULL, 10) != 0) {
 			return createError(INV_HEADER, i + 1);
 		}
+		
+		if (strcmp(arr[i].tag, "HEAD") != 0 && strtol(arr[i].level, NULL, 10) == 0 && headerCheck == true) {
+			headerCheck = false;
+			endOfHeader = i;
+		}
+		
+		if (headerCheck == true) {
+			if (strcmp(arr[i].tag, "GEDC") == 0) {
+				gedcCheck = true;
+			}
+			
+			if (gedcCheck == true) {
+				if (strcmp(arr[i].tag, "VERS") == 0 && arr[i].value != NULL) {
+					versCheck = true;
+				}
+			}
+			
+			if (strcmp(arr[i].tag, "CHAR") == 0 && arr[i].value != NULL) {
+				charCheck = true;
+			}
+			if (strcmp(arr[i].tag, "SOUR") == 0 && arr[i].value != NULL) {
+				sourceCheck = true;
+			}
+			if (strcmp(arr[i].tag, "SUBM") == 0 && (arr[i].value != NULL || arr[i].senderAddress != NULL)) {
+				submitterCheck = true;
+			}
+		}
+		
+		if (strcmp(arr[i].tag, "SUBM") == 0 && strtol(arr[i].level, NULL, 10) == 0) {
+			mainSubmitter = true;
+		}
+		
+		currentLevel = strtol(arr[i].level, NULL, 10);
+		
+		if ((currentLevel - tempLevel) > 1) {
+			return createError(INV_RECORD, i + 1);
+		}
+		
+		tempLevel = currentLevel;
+	}
+	
+	if (versCheck == false || charCheck == false || sourceCheck == false || submitterCheck == false) {	
+		return createError(INV_HEADER, endOfHeader + 1);
+	}
+	
+	if (mainSubmitter == false) {
+		return createError(INV_GEDCOM, -1);
 	}
 	
 	if (strcmp(arr[size-1].tag, "TRLR") != 0) {
-		return createError(INV_RECORD,  size);
+		return createError(INV_GEDCOM, -1);
 	}
 	
 	return createError(OK, -1);
@@ -430,7 +476,9 @@ char * myfgets(char *dst, int max, FILE *fp)
 		
 		position = ftell(fp);
 		temp = fgetc(fp);
-		
+		if (temp == EOF) {
+			break;
+		}
 		if (c == '\n' && temp != '\r') {
 			fseek(fp, position, SEEK_SET);
 			break;

@@ -8,7 +8,7 @@ int main () {
 	
 	GEDCOMobject * obj = NULL;
 	
-	GEDCOMerror e = createGEDCOM("simpleValid1R.ged", &(obj));
+	GEDCOMerror e = createGEDCOM("nonASCIIEncoded.ged", &(obj));
 	
 	printf("%s", printError(e));
 	
