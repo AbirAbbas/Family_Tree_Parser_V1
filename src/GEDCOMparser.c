@@ -36,26 +36,27 @@ GEDCOMerror createGEDCOM(char* fileName, GEDCOMobject** obj) {
 	
 	arrayList gedFile = initializeArray(inFile);
 	
-	int size = gedFile.size;
+	int * size = malloc(sizeof(int));
 	
-	tagList * allTags = initializeTags(gedFile);
+	tagList * allTags = initializeTags(gedFile, size);
 	
-	for (int i = 0; i < size; i++) {
-		printf("Length : %d, Level : %s, Tag : %s, Address : %s, Value : %s\n", allTags[i].length, allTags[i].level, allTags[i].tag, allTags[i].address, allTags[i].value);
+	container c;
+	c.t = allTags;
+	c.size = *size;
+	
+	GEDCOMerror e = checkForError(c.t, c.size);
+	
+	if (e.type == OK) {
+		
+	}
+	else {
+		return e;
 	}
 	
-	
-	
-	
-	
-	
-	
-	
 	//after it is done being used
-	freeTaglist(allTags, size);
-	
-	obj = initObject(obj);
-	
+	freeTaglist(allTags, *size);
+	free(size);
+	//obj = initObject(obj);
 	fclose(inFile);
 
 	return createError((ErrorCode)OK, -1);
@@ -71,7 +72,48 @@ void deleteGEDCOM(GEDCOMobject * obj) {
 }
 
 char* printError(GEDCOMerror err) {
-	return NULL;
+	char * error = calloc(1024, sizeof(char));
+	if (err.type == OK) {
+		strcpy(error, "No errors reported\n");
+	}
+	else if (err.type == INV_FILE) {
+		strcpy(error, "Error while opening file of format .ged!\n");
+	}
+	else if (err.type == INV_GEDCOM) {
+		strcpy(error, "Invalid Gedcom object, Missing header or TRLR character!\n");
+		char * num = malloc(sizeof(char) * 32);
+		sprintf(num, "%d", err.line);
+		if (num != NULL) {
+			strcat(error, num);
+			free(num);
+		}
+		strcat(error, "\n");
+	}
+	else if (err.type == INV_HEADER) {
+		strcpy(error, "Invalid Header Object, at line ");
+		char * num = malloc(sizeof(char) * 32);
+		sprintf(num, "%d", err.line);
+		if (num != NULL) {
+			strcat(error, num);
+			free(num);
+		}
+		strcat(error, "\n");
+	}
+	else if (err.type == INV_RECORD) {
+		strcpy(error, "Invalid Record Object, at line ");
+		char * num = malloc(sizeof(char) * 32);
+		sprintf(num, "%d", err.line);
+		if (num != NULL) {
+			strcat(error, num);
+			free(num);
+		}
+		strcat(error, "\n");
+	}
+	else if (err.type == OTHER_ERROR) {
+		strcpy(error, "System out of memory!\n");
+	}
+	
+	return error;
 }
 
 Individual* findPerson(const GEDCOMobject* familyRecord, bool (*compare)(const void* first, const void* second), const void* person) {
