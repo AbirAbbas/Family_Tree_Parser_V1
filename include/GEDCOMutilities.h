@@ -51,4 +51,14 @@ char * myfgets(char *dst, int max, FILE *fp);
 
 GEDCOMerror checkForError(tagList * arr, int size);
 
+void recursiveDescendant(List * descendants, Individual * i);
+
+bool checkIfSpouse (Family * f, Individual * i);
+
+bool checkIfExists(List * l, Individual * i);
+
+bool compareFindPerson(const void* first,const void* second);
+
+Individual * createCopy(Individual * input);
+
 #endif

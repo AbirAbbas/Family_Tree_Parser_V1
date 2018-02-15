@@ -9,7 +9,7 @@
 1 CHAR ANSEL
 1 SUBM @U1@
 0 @I1@ INDI
-1 NAME John /Smith/
+1 NAME John //
 1 SEX M
 1 FAMS @F1@
 0 @I2@ INDI
@@ -18,7 +18,7 @@
 1 FAMS @F1@
 0 @I3@ INDI
 1 NAME James /Smi
-2 CONT th/
+2 CONC th/
 1 SEX M
 1 FAMC @F1@
 0 @F1@ FAM

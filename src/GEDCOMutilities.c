@@ -391,7 +391,7 @@ stringInformation stringTokenizer(char * input) {
 	
 	strcpy(temp, input);
 	
-	for (char * counter = strtok(temp, " "); counter != NULL; counter = strtok(NULL, " ")) {
+	for (char * counter = strtok(temp, " /"); counter != NULL; counter = strtok(NULL, " /")) {
 		countDelim++;
 	}
 	
@@ -403,7 +403,7 @@ stringInformation stringTokenizer(char * input) {
 	
 	countDelim = 0;
 	
-	for (char * counter = strtok(temp, " "); counter != NULL; counter = strtok(NULL, " ")) {
+	for (char * counter = strtok(temp, " /"); counter != NULL; counter = strtok(NULL, " /")) {
 		tokenizedString[countDelim] = calloc(strlen(counter) + 1, sizeof(char));
 		//tokenizedString[countDelim] = calloc(1,sizeof(char) * strlen(counter) + 1);
 		strcpy(tokenizedString[countDelim], counter);
@@ -490,9 +490,135 @@ char * myfgets(char *dst, int max, FILE *fp)
 		
 		fseek(fp, position, SEEK_SET);
 	}
+	
 	*p = 0;
 	if (p == dst || c == EOF)
 		return NULL;
 	return (p);
+}
+
+void recursiveDescendant(List * descendants, Individual * i) {
+	if (i == NULL) {
+		return;
+	}
+	
+	if (i->families.length == 0) {
+		return;
+	}
+	
+	Node * n = i->families.head;
+	
+	while (n != NULL) {
+		if (checkIfSpouse(n->data, i)) {
+			Node * e = ((Family*)(n->data))->children.head;
+			while (e!= NULL) {
+				if (!compareFindPerson(i, e->data)) {
+					recursiveDescendant(descendants, e->data);
+					if (!checkIfExists(descendants, e->data)) {
+						insertBack(descendants, createCopy(e->data));
+					}
+				}
+				e=e->next;
+			}
+		}
+		n = n->next;
+	}
+}
+
+bool checkIfSpouse (Family * f, Individual * i) {
+	
+	if (f==NULL || i == NULL) {
+		return false;
+	}
+	
+	if (f->husband == NULL) {
+		return false;
+	}
+	else if (f->wife == NULL) {
+		return false;
+	}
+	
+	else if (i==NULL) {
+		return false;
+	}
+	
+	else if (compareFindPerson(f->husband, i)) {
+		return true;
+	}
+	
+	else if (compareFindPerson(f->wife, i)) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool checkIfExists(List * l, Individual * i) {
+	
+	if (l == NULL || i == NULL) {
+		return false;
+	}
+	
+	Node * n = l->head;
+	
+	while (n!=NULL) {
+		if (compareFindPerson(n->data, i)) {
+			return true;
+		}
+		n = n->next;
+	}
+	return false;	
+}
+
+bool compareFindPerson(const void* first,const void* second) {
+	
+	if (first == NULL || second == NULL) {
+		return false;
+	}
+	
+	char temp[1024];
+	
+	strcpy(temp, ((Individual*)first)->givenName);
+	strcat(temp, ", ");
+	strcat(temp, ((Individual*)first)->surname);
+	
+	char secondTemp[1024];
+	
+	strcpy(secondTemp, ((Individual*)second)->givenName);
+	strcat(secondTemp, ", ");
+	strcat(secondTemp, ((Individual*)second)->surname);
+	
+	if (strcmp(temp, secondTemp) == 0) {
+		return true;
+	}
+	else {
+		return false;
+	}
+
+}
+
+Individual * createCopy(Individual * input) {
+	if (input == NULL) {
+		return NULL;
+	}
+	
+	Individual * i = malloc(sizeof(Individual));
+	if (input->givenName != NULL) {
+		i->givenName = malloc(strlen(input->givenName) * 2);
+		strcpy(i->givenName, input->givenName);
+	}
+	
+	if (input->surname != NULL) {
+		i->surname = malloc(strlen(input->surname) * 2);
+		strcpy(i->surname, input->surname);
+	}
+	
+	i->otherFields = initializeList(printField, deleteField, compareFields);
+	i->events = initializeList(printEvent, deleteEvent, compareEvents);
+	i->families = initializeList(printFamily, deleteFamily, compareFamilies);
+	
+	return i;
+	
 }
 
