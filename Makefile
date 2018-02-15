@@ -20,10 +20,6 @@ clean:
 	rm -f $(BIN)*.o
 	rm -f $(BIN)*.a
 	
-test: 
-	$(CC) $(CFLAGS)  -Iinclude $(SRC)main.c $(BIN)libparser.a $(BIN)liblist.a
-	
-	
 $(BIN)LinkedListAPI.o: $(SRC)LinkedListAPI.c
 	$(CC) $(CLFAGS) -c $(SRC)LinkedListAPI.c -Iinclude -o $(BIN)LinkedListAPI.o
 	
@@ -35,5 +31,8 @@ $(BIN)GEDCOMutilities.o: $(SRC)GEDCOMutilities.c
 	
 main: $(BIN)libparser.a $(BIN)liblist.a
 	$(CC) $(CFLAGS) -Iinclude $(SRC)main.c $(BIN)libparser.a $(BIN)liblist.a -o $(BIN)program
+	
+runTest: $(BIN)testProgram
+	$(BIN)testProgram
 
 

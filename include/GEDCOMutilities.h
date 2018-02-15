@@ -107,4 +107,8 @@ bool checkFamilyEvent (char * tag);
 
 Event * initializeEvent ();
 
+bool findAndLink (List addressList, void * data);
+
+void freeLists (List addressList, List recieveList);
+
 #endif

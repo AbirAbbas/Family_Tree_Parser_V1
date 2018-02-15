@@ -24,7 +24,7 @@ GEDCOMerror parserDistributor (GEDCOMobject * obj, container allInformation, Lis
 		}
 		else if (strcmp(tagInformation[*i].tag, "INDI") == 0) {
 			insertBack(&(obj->individuals), initializeIndividual());
-			if (tagInformation[*i].recieverAddress != NULL) insertBack(recieveList, createAddress(NULL, NULL, NULL, tagInformation[*i].recieverAddress, getFromBack(obj->individuals), (*i) + 1));
+			insertBack(recieveList, createAddress(NULL, NULL, NULL, tagInformation[*i].recieverAddress, getFromBack(obj->individuals), (*i) + 1));
 			(*i)++;
 			individualParser(obj, tagInformation, i, sendList, recieveList);
 			//call individual parser
@@ -40,6 +40,8 @@ GEDCOMerror parserDistributor (GEDCOMobject * obj, container allInformation, Lis
 			(*i)++;
 		}
 	}
+	
+	free(i);
 	return createError(OK, -1);
 }
 
@@ -58,7 +60,7 @@ GEDCOMerror headParser (GEDCOMobject * obj, tagList * tagInformation, int * curr
 			if (strcmp(tagInformation[*currentLocation].value, "ANSEL") == 0) {
 				h->encoding = ANSEL;
 			}
-			else if (strcmp(tagInformation[*currentLocation].value, "UTF8") == 0) {
+			else if (strcmp(tagInformation[*currentLocation].value, "UTF-8") == 0) {
 				h->encoding = UTF8;
 			}
 			else if (strcmp(tagInformation[*currentLocation].value, "UNICODE") == 0) {
@@ -71,7 +73,7 @@ GEDCOMerror headParser (GEDCOMobject * obj, tagList * tagInformation, int * curr
 		}
 		else if (gedcVersion == true) {
 			if (strcmp(tagInformation[*currentLocation].tag, "VERS") == 0) {
-				h->gedcVersion = (float)(strtol(tagInformation[*currentLocation].value, NULL, 10));
+				h->gedcVersion = (atof(tagInformation[*currentLocation].value));
 			}
 			gedcVersion = false;
 		}
@@ -128,8 +130,39 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 	
 	Individual * i = getFromBack(obj->individuals);
 	
+	bool isEvent = false;
+	
 	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
-		if (strcmp(tagInformation[*currentLocation].tag, "NAME") == 0) {
+		
+		if (strcmp(tagInformation[*currentLocation].level, "1") == 0) {
+			//checks if Level 1 is an event!
+			isEvent = false;
+		}
+		
+		if (isEvent == true) {
+			
+			Event * e = getFromBack(i->events);
+			
+			if (strcmp(tagInformation[*currentLocation].tag, "DATE") == 0) {
+				e->date = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(e->date, tagInformation[*currentLocation].value);
+			}
+			else if (strcmp(tagInformation[*currentLocation].tag, "PLAC") == 0) {
+				e->place = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(e->place, tagInformation[*currentLocation].value);
+			}
+			else {
+				Field * f = initializeField();
+				f->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+				f->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+				strcpy(f->tag, tagInformation[*currentLocation].tag);
+				strcpy(f->value, tagInformation[*currentLocation].value);
+			
+				insertBack(&(e->otherFields), f);
+			}
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "NAME") == 0) {
 			char * givenName = NULL;
 			char * surName = NULL;
 			
@@ -141,6 +174,8 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 				givenName = fullName.tokenizedString[0];
 				surName = fullName.tokenizedString[1];
 				
+				free(fullName.tokenizedString);
+				
 				i->givenName = givenName;
 				i->surname = surName;
 				
@@ -149,6 +184,7 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 				free(i->givenName);
 				givenName = fullName.tokenizedString[0];
 				i->givenName = givenName;
+				free(fullName.tokenizedString);
 			}
 			else if (fullName.size > 2) {
 				for (int i = 0; i < fullName.size; i++) {
@@ -157,9 +193,6 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 				free(fullName.tokenizedString);
 				
 				return createError(INV_RECORD, (*currentLocation) + 1);
-			}
-			else {
-				
 			}
 			
 		}
@@ -177,8 +210,26 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 				strcpy(i->surname, tagInformation[*currentLocation].value);
 			}
 		}
-		else if (checkIndividualEvent(tagInformation[*currentLocation].tag)) {
+		else if (strcmp(tagInformation[*currentLocation].tag, "FAMC") == 0 || strcmp(tagInformation[*currentLocation].tag, "FAMS") == 0) {
+			insertBack(sendList, createAddress((&(i->families)), NULL, NULL, tagInformation[*currentLocation].senderAddress, NULL, (*currentLocation) + 1));
+		}
+		else if (checkIndividualEvent(tagInformation[*currentLocation].tag) && isEvent == false) {
+			Event * e = initializeEvent();
+			strcpy(e->type, tagInformation[*currentLocation].tag);
+			
+			insertBack(&(i->events), e);
+			isEvent = true;
 			//Continue from inserting event!
+		}
+		else {
+			Field * f = initializeField();
+			f->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+			f->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+			strcpy(f->tag, tagInformation[*currentLocation].tag);
+			strcpy(f->value, tagInformation[*currentLocation].value);
+			
+			insertBack(&(i->otherFields), f);
 		}
 		(*currentLocation)++;
 	}
@@ -188,7 +239,68 @@ GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int 
 
 GEDCOMerror familyParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList) {
 	
+	Family * f = getFromBack(obj->families);
+	
+	bool isEvent = false;
+	
 	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
+		
+		if (strcmp(tagInformation[*currentLocation].level, "1") == 0) {
+			//checks if Level 1 is an event!
+			isEvent = false;
+		}
+		
+		if (checkFamilyEvent(tagInformation[*currentLocation].tag) && isEvent == false) {
+			Event * e = initializeEvent();
+			strcpy(e->type, tagInformation[*currentLocation].tag);
+			
+			insertBack(&(f->events), e);
+			isEvent = true;
+			//Continue from inserting event!
+		}
+		else if (isEvent == true) {
+			
+			Event * e = getFromBack(f->events);
+			
+			if (strcmp(tagInformation[*currentLocation].tag, "DATE") == 0) {
+				e->date = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(e->date, tagInformation[*currentLocation].value);
+			}
+			else if (strcmp(tagInformation[*currentLocation].tag, "PLAC") == 0) {
+				e->place = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(e->place, tagInformation[*currentLocation].value);
+			}
+			else {
+				Field * f = initializeField();
+				f->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+				f->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+				strcpy(f->tag, tagInformation[*currentLocation].tag);
+				strcpy(f->value, tagInformation[*currentLocation].value);
+			
+				insertBack(&(e->otherFields), f);
+			}
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "CHIL") == 0) {
+			insertBack(sendList, createAddress(&(f->children), NULL, NULL, tagInformation[*currentLocation].senderAddress, NULL, (*currentLocation) + 1));
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "HUSB") == 0) {
+			insertBack(sendList, createAddress(NULL, NULL, &(f->husband), tagInformation[*currentLocation].senderAddress, NULL, (*currentLocation) + 1));
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "WIFE") == 0) {
+			insertBack(sendList, createAddress(NULL, NULL, &(f->wife), tagInformation[*currentLocation].senderAddress, NULL, (*currentLocation) + 1));
+		}
+		else {
+			Field * t = initializeField();
+			t->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+			t->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+			strcpy(t->tag, tagInformation[*currentLocation].tag);
+			strcpy(t->value, tagInformation[*currentLocation].value);
+			
+			insertBack(&(f->otherFields), t);
+		}
+		
 		(*currentLocation)++;
 	}
 	
@@ -840,12 +952,61 @@ bool compareFindPerson(const void* first,const void* second) {
 	strcat(secondTemp, ", ");
 	strcat(secondTemp, ((Individual*)second)->surname);
 	
-	if (strcmp(temp, secondTemp) == 0) {
-		return true;
-	}
-	else {
+	if (strcmp(temp, secondTemp) != 0) {
 		return false;
 	}
+	
+	
+	int counter1 = 0;
+	int counter2 = 0;
+	
+	Node * n = ((Individual*)first)->events.head;
+	
+	while (n!= NULL) {
+		counter1++;
+		n=n->next;
+	}
+	
+	n = ((Individual*)first)->families.head;
+	
+	while (n!= NULL) {
+		counter1++;
+		n=n->next;
+	}
+	
+	n = ((Individual*)first)->otherFields.head;
+	
+	while (n!= NULL) {
+		counter1++;
+		n=n->next;
+	}
+	
+	n = ((Individual*)second)->events.head;
+	
+	while (n!= NULL) {
+		counter2++;
+		n=n->next;
+	}
+	
+	n = ((Individual*)second)->families.head;
+	
+	while (n!= NULL) {
+		counter2++;
+		n=n->next;
+	}
+	
+	n = ((Individual*)second)->otherFields.head;
+	
+	while (n!= NULL) {
+		counter2++;
+		n=n->next;
+	}
+	
+	if (counter1 != counter2) {
+		return false;
+	}
+	
+	return true;
 
 }
 
@@ -951,4 +1112,78 @@ bool checkFamilyEvent (char * tag) {
 	}
 	
 	return false;
+}
+
+bool findAndLink (List addressList, void * data) {
+	
+	addressInformation * a = data;
+	
+	char * address = a->address;
+	
+	
+	Node * n = addressList.head;
+	
+	while (n!=NULL) {
+		addressInformation * b = n->data;
+		if (compareAddress(b->address, address) == 0) {
+			//printf("%d\n", ((addressInformation*)(n->data))->type);
+			
+			if (a->type == 0) { // List *
+				
+				if (b->type == 3) { // Void * 
+					List * l = a->listPointer;
+					insertBack(l, b->initializedPointer);
+					return true;
+				}
+				
+			}
+			else if (a->type == 1) { // Submitter *
+				
+				if (b->type == 1) { // Submitter *
+					
+					*(a->submitterPointer) = *(b->submitterPointer);
+					return true;
+				}				
+			}
+			else if (a->type == 2) { // Individual *
+				
+				if (b->type == 3) { // Void * 
+					*(a->spousePointer) = b->initializedPointer;
+					return true;
+				}
+			}
+		}
+		n=n->next;
+	}
+	
+	return false;
+}
+
+void freeLists (List addressList, List recieveList) {
+	Node * n = addressList.head;
+	Node * delete = NULL;
+	
+	while (n!=NULL) {
+		addressInformation * a = n->data;
+		
+		free(a->address);
+		free(a);
+		delete = n;
+		n = n->next;
+		free(delete);
+	}
+	
+	n = recieveList.head;
+	
+	while (n!=NULL) {
+		addressInformation * a = n->data;
+		
+		free(a->address);
+		free(a);
+		delete = n;
+		n = n->next;
+		free(delete);
+	}
+	
+	
 }

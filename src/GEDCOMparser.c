@@ -67,6 +67,24 @@ GEDCOMerror createGEDCOM(char* fileName, GEDCOMobject** obj) {
 	}
 	else {
 		return e;
+	}
+	
+	Node * n = sendList->head;
+		
+	while (n!=NULL) {
+		
+		if (!findAndLink(*recieveList, n->data)) {
+			//deleteGEDCOM(*obj);
+			//freeLists(addressList, recieveList);
+			//freeStringArray(splitString);
+			//fclose(inFile);
+			//free(currentRecord);
+			//free(subRecord);
+			//free(checkHeader); 
+			return createError(INV_GEDCOM, -1);
+		}
+
+		n = n->next;
 	}	
 		
 		
@@ -75,6 +93,11 @@ GEDCOMerror createGEDCOM(char* fileName, GEDCOMobject** obj) {
 	//after it is done being used
 	freeTaglist(allTags, *size);
 	free(size);
+	
+	freeLists(*sendList, *recieveList);
+	
+	free(sendList);
+	free(recieveList);
 	
 	//temporary!
 	fclose(inFile);
@@ -158,6 +181,38 @@ char* printGEDCOM(const GEDCOMobject* obj) {
 
 void deleteGEDCOM(GEDCOMobject * obj) {
 	
+	if (obj == NULL) {
+		return;
+	}
+	
+	Header * h = obj->header;
+	Submitter * sub = obj->submitter;
+	
+	//Header started
+	
+	if (h != NULL) {
+		clearList(&(h->otherFields));
+		free(h);
+	//Header deleted
+	}
+		
+	//printf("TESSST\n");
+	//Families started
+	clearList(&(obj->families));
+	//FamiliesDeleted
+	
+	//Individuals started
+	clearList(&(obj->individuals));
+	//Invidiaul deleted
+	
+	//Submitter->otherFields started
+	if (sub!= NULL) {
+		clearList(&(sub->otherFields));
+		free(sub);
+	}
+	
+	free(obj);
+	//Submitter->otherFields deleted
 }
 
 char* printError(GEDCOMerror err) {
@@ -250,6 +305,18 @@ List getDescendants(const GEDCOMobject* familyRecord, const Individual* person) 
 //EVENTS
 void deleteEvent(void* toBeDeleted) {
 	
+	if (toBeDeleted == NULL) {
+		return;
+	}
+	
+	Event * e = ((Event*)toBeDeleted);
+	
+	if (e->date != NULL) free(e->date);
+	if (e->place != NULL) free(e->place);
+	
+	clearList(&(e->otherFields));
+	
+	free(e);
 }
 
 int compareEvents(const void* first,const void* second) {
@@ -308,6 +375,34 @@ char* printEvent(void* toBePrinted) {
 
 //INDIVIDUAL
 void deleteIndividual(void* toBeDeleted) {
+	
+	if (toBeDeleted == NULL) {
+		return;
+	}
+	
+	Individual * i = (Individual*)toBeDeleted;
+	
+	if (i->givenName!=NULL) {
+		free(i->givenName);
+	}
+	
+	if (i->surname != NULL) {
+		free(i->surname);
+	}
+	
+	clearList(&(i->events));
+	clearList(&(i->otherFields));
+	
+	Node * n = i->families.head;
+	Node * delete;
+	
+	while (n != NULL) {
+		delete = n;
+		n = n->next;
+		free(delete);
+	}
+	
+	free(i);
 	
 }
 
@@ -374,6 +469,29 @@ char* printIndividual(void* toBePrinted) {
 //FAMILY
 void deleteFamily(void* toBeDeleted) {
 	
+	if (toBeDeleted == NULL) {
+		return;
+	}
+	
+	Family * f = (Family*)toBeDeleted;
+	
+	clearList(&(f->otherFields));
+	
+	clearList(&(f->events));
+	
+	Node * n = f->children.head;
+	Node * delete;
+	
+	while (n != NULL) {
+		delete = n;
+		n = n->next;
+		free(delete);
+	}
+	
+	f->wife = NULL;
+	f->husband = NULL;
+	
+	free(f);
 }
 
 int compareFamilies(const void* first,const void* second) {
@@ -450,6 +568,17 @@ char* printFamily(void* toBePrinted) {
 
 //FIELD
 void deleteField(void* toBeDeleted) {
+	
+	Field * f = (Field*)toBeDeleted;
+	
+	if (f->tag != NULL) {
+		free(f->tag);
+	}
+	if(f->value != NULL) {
+		free(f->value);
+	}
+	
+	free(f);
 	
 }
 
