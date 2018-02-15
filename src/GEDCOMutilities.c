@@ -6,14 +6,265 @@
 #include "GEDCOMparser.h"
 #include "LinkedListAPI.h"
 
+
+GEDCOMerror parserDistributor (GEDCOMobject * obj, container allInformation, List * sendList, List * recieveList) {
+	tagList * tagInformation = allInformation.t;
+	int * i = malloc(sizeof(int));
+	
+	for (*i = 0; *i < allInformation.size;) {
+		if (strcmp(tagInformation[*i].tag, "HEAD") == 0) {
+			(*i)++;
+			headParser(obj, tagInformation, i, sendList, recieveList);
+		}
+		else if (strcmp(tagInformation[*i].tag, "SUBM") == 0) {
+			insertBack(recieveList, createAddress(NULL, &(obj->submitter), NULL , tagInformation[*i].recieverAddress, NULL, (*i) + 1));
+			(*i)++;
+			submitterParser(obj, tagInformation, i, sendList, recieveList);
+			//call submitter parser
+		}
+		else if (strcmp(tagInformation[*i].tag, "INDI") == 0) {
+			insertBack(&(obj->individuals), initializeIndividual());
+			if (tagInformation[*i].recieverAddress != NULL) insertBack(recieveList, createAddress(NULL, NULL, NULL, tagInformation[*i].recieverAddress, getFromBack(obj->individuals), (*i) + 1));
+			(*i)++;
+			individualParser(obj, tagInformation, i, sendList, recieveList);
+			//call individual parser
+		}
+		else if (strcmp(tagInformation[*i].tag, "FAM") == 0) {
+			insertBack(&(obj->families), initializeFamily());
+			insertBack(recieveList, createAddress(NULL, NULL, NULL, tagInformation[*i].recieverAddress, getFromBack(obj->families), (*i) + 1));
+			(*i)++;
+			familyParser(obj, tagInformation, i, sendList, recieveList);
+			//call Family parser
+		}
+		else {
+			(*i)++;
+		}
+	}
+	return createError(OK, -1);
+}
+
+GEDCOMerror headParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList) {
+	bool gedcVersion = false;
+	Header * h = obj->header;
+		
+	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
+		
+		if (strcmp(tagInformation[*currentLocation].tag, "SOUR") == 0) strcpy(h->source, tagInformation[*currentLocation].value);
+		
+		else if (strcmp(tagInformation[*currentLocation].tag, "GEDC") == 0) gedcVersion = true;
+		
+		else if (strcmp(tagInformation[*currentLocation].tag, "CHAR") == 0) {
+			
+			if (strcmp(tagInformation[*currentLocation].value, "ANSEL") == 0) {
+				h->encoding = ANSEL;
+			}
+			else if (strcmp(tagInformation[*currentLocation].value, "UTF8") == 0) {
+				h->encoding = UTF8;
+			}
+			else if (strcmp(tagInformation[*currentLocation].value, "UNICODE") == 0) {
+				h->encoding = UNICODE;
+			}
+			else if (strcmp(tagInformation[*currentLocation].value, "ASCII") == 0) {
+				h->encoding = ASCII;
+			}
+			
+		}
+		else if (gedcVersion == true) {
+			if (strcmp(tagInformation[*currentLocation].tag, "VERS") == 0) {
+				h->gedcVersion = (float)(strtol(tagInformation[*currentLocation].value, NULL, 10));
+			}
+			gedcVersion = false;
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "SUBM") == 0) {
+			
+			insertBack(sendList, createAddress(NULL, &(h->submitter), NULL, tagInformation[*currentLocation].senderAddress, NULL, (*currentLocation) + 1));
+			//ADD Linker afterwards!
+		}
+		else {
+			//Otherfields
+			Field * f = initializeField();
+			f->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+			f->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+			strcpy(f->tag, tagInformation[*currentLocation].tag);
+			strcpy(f->value, tagInformation[*currentLocation].value);
+			
+			insertBack(&(h->otherFields), f);
+		}
+		
+		(*currentLocation)++;
+	}
+	
+	return createError(OK, -1);
+}
+
+GEDCOMerror submitterParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList) {
+	
+	Submitter * s = obj->submitter;
+	
+	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
+		if (strcmp(tagInformation[*currentLocation].tag, "NAME") == 0) strcpy(s->submitterName, tagInformation[*currentLocation].value);
+		
+		else if (strcmp(tagInformation[*currentLocation].tag, "ADDR") == 0) strcpy(s->address, tagInformation[*currentLocation].value);
+		
+		else {
+			Field * f = initializeField();
+			f->tag = calloc(strlen(tagInformation[*currentLocation].tag) + 1, sizeof(char));
+			f->value = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+			
+			strcpy(f->tag, tagInformation[*currentLocation].tag);
+			strcpy(f->value, tagInformation[*currentLocation].value);
+			
+			insertBack(&(s->otherFields), f);
+		}
+		
+		(*currentLocation)++;
+	}
+	
+	return createError(OK, -1);
+}
+
+GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList) {
+	
+	Individual * i = getFromBack(obj->individuals);
+	
+	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
+		if (strcmp(tagInformation[*currentLocation].tag, "NAME") == 0) {
+			char * givenName = NULL;
+			char * surName = NULL;
+			
+			stringInformation fullName = stringTokenizer(tagInformation[*currentLocation].value);
+			
+			if (fullName.size == 2 && strcmp(i->givenName, " ") == 0 && strcmp(i->surname, " ") == 0) {
+				free(i->givenName);
+				free(i->surname);
+				givenName = fullName.tokenizedString[0];
+				surName = fullName.tokenizedString[1];
+				
+				i->givenName = givenName;
+				i->surname = surName;
+				
+			}
+			else if (fullName.size == 1 && strcmp(i->givenName, " ") == 0) {
+				free(i->givenName);
+				givenName = fullName.tokenizedString[0];
+				i->givenName = givenName;
+			}
+			else if (fullName.size > 2) {
+				for (int i = 0; i < fullName.size; i++) {
+					free(fullName.tokenizedString[i]);
+				}
+				free(fullName.tokenizedString);
+				
+				return createError(INV_RECORD, (*currentLocation) + 1);
+			}
+			else {
+				
+			}
+			
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "GIVN") == 0) {
+			if (strcmp(i->givenName, " ") == 0) {
+				free(i->givenName);
+				i->givenName = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(i->givenName, tagInformation[*currentLocation].value);
+			}
+		}
+		else if (strcmp(tagInformation[*currentLocation].tag, "SURN") == 0) {
+			if (strcmp(i->surname, " ") == 0) {
+				free(i->surname);
+				i->surname = calloc(strlen(tagInformation[*currentLocation].value) + 1, sizeof(char));
+				strcpy(i->surname, tagInformation[*currentLocation].value);
+			}
+		}
+		else if (checkIndividualEvent(tagInformation[*currentLocation].tag)) {
+			//Continue from inserting event!
+		}
+		(*currentLocation)++;
+	}
+	
+	return createError(OK, -1);
+}
+
+GEDCOMerror familyParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList) {
+	
+	while (strcmp(tagInformation[*currentLocation].level, "0") != 0) {
+		(*currentLocation)++;
+	}
+	
+	return createError(OK, -1);
+}
+
 GEDCOMobject ** initObject (GEDCOMobject ** obj) {	
 	//creates object
 	(*obj) = calloc(1, sizeof(GEDCOMobject));
 	//initializes List
 	(*obj)->individuals = initializeList(printIndividual, deleteIndividual, compareIndividuals);
 	(*obj)->families = initializeList(printFamily, deleteFamily, compareFamilies);
+	
+	(*obj)->header = initializeHeader();
+	(*obj)->submitter = initializeSubmitter();
 
 	return obj;
+}
+
+Event * initializeEvent () {
+	Event * e = calloc(1, sizeof(Event));
+	e->date = NULL;
+	e->place = NULL;
+	e->otherFields = initializeList(printField, deleteField, compareFields);
+	
+	return e;
+}
+
+Header * initializeHeader () {
+	Header * h = malloc(sizeof(Header));
+	h->otherFields = initializeList(printField, deleteField, compareFields);
+	
+	return h;
+}
+
+Submitter * initializeSubmitter () {
+	Submitter * s = malloc(sizeof(Submitter) + 1024);
+	s->otherFields = initializeList(printField, deleteField, compareFields);
+	
+	return s;
+}
+
+Individual * initializeIndividual () {
+	Individual * i = malloc(sizeof(Individual));
+	i->givenName = malloc(sizeof(" "));
+	i->surname = malloc(sizeof(" "));
+	
+	strcpy(i->givenName, " ");
+	strcpy(i->surname, " ");
+	
+	i->events = initializeList(printEvent, deleteEvent, compareEvents);
+	i->otherFields = initializeList(printField, deleteField, compareFields);
+	i->families = initializeList (printFamily, deleteFamily, compareFamilies);
+	
+	return i;
+}
+
+Family * initializeFamily () {
+	Family * f = malloc(sizeof(Family));
+	
+	f->husband = NULL;
+	f->wife = NULL;
+	
+	f->events = initializeList(printEvent, deleteEvent, compareEvents);
+	f->children = initializeList(printIndividual, deleteIndividual, compareIndividuals);
+	f->otherFields = initializeList(printField, deleteField, compareFields);
+	
+	return f;
+}
+
+Field * initializeField () {
+	Field * f = malloc(sizeof(Field));
+	f->tag = NULL;
+	f->value = NULL;
+	
+	return f;
 }
 
 bool fileExist (const char * fileName) {
@@ -622,3 +873,82 @@ Individual * createCopy(Individual * input) {
 	
 }
 
+void dummyDelete(void* toBeDeleted) {
+	
+}
+
+int dummyCompare(const void* first,const void* second) {
+	return 0;
+}
+
+char* dummyPrint(void* toBePrinted) {
+	return "";
+}
+
+int compareAddress(const void* first,const void* second) {
+	return strcmp(((char*)first), ((char*)second));
+}
+
+addressInformation * createAddress (List * listPointer, Submitter ** submitterPointer, Individual ** spousePointer, char * address, void * initializedPointer, int count) {
+	addressInformation * a = calloc(1,sizeof(addressInformation));
+	a->address = calloc(1,(strlen(address) + 1) * sizeof(char));
+	
+	if (listPointer != NULL) {
+		a->listPointer = listPointer;
+		a->type = 0;
+	}
+	if (submitterPointer != NULL) {
+		a->submitterPointer = submitterPointer;
+		a->type = 1;
+	}
+	if (spousePointer != NULL) {
+		a->spousePointer = spousePointer;
+		a->type = 2;
+	}
+	if (initializedPointer != NULL) {
+		a->initializedPointer = initializedPointer;
+		a->type = 3;
+	}
+	
+	a->count = count;
+
+	strcpy(a->address, address);
+	
+	return a;
+}
+
+bool checkIndividualEvent (char * tag) {
+	
+	char * eventTags[] = { "BIRT", "CHR", "ADOP", "DEAT", "BURI", "CREM",
+	"BAPM", "BARM", "BASM", "BLES", "CHRA", "CONF", "FCOM", "ORDN", "NATU", "EMIG",
+	"EMIG", "IMMI", "CENS", "PROB", "WILL", "GRAD", "RETI", "EVEN" };
+	
+	if (tag == NULL) {
+		return false;
+	}
+	
+	for (int i = 0; i < 24; i ++) {
+		if (strcmp(tag, eventTags[i]) == 0) {
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+bool checkFamilyEvent (char * tag) {
+	
+	char * feventTags[] = { "ANUL", "CENS", "DIV", "DIVF", "ENGA", "MARB", "MARC", "MARR", "MARL", "MARS" };
+	
+	if (tag == NULL) {
+		return false;
+	}
+	
+	for (int i = 0; i < 10; i ++) {
+		if (strcmp(tag, feventTags[i]) == 0) {
+			return true;
+		}
+	}
+	
+	return false;
+}

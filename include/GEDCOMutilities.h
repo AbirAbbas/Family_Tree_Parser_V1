@@ -29,6 +29,16 @@ typedef struct {
 	int size;
 } stringInformation;
 
+typedef struct {
+	char * address;
+	List * listPointer;
+	Individual ** spousePointer;
+	Submitter ** submitterPointer;
+	void * initializedPointer;
+	int type;
+	int count;
+} addressInformation;
+
 GEDCOMobject ** initObject (GEDCOMobject ** obj);
 
 bool fileExist (const char * fileName);
@@ -60,5 +70,41 @@ bool checkIfExists(List * l, Individual * i);
 bool compareFindPerson(const void* first,const void* second);
 
 Individual * createCopy(Individual * input);
+
+Header * initializeHeader ();
+
+Submitter * initializeSubmitter ();
+
+Individual * initializeIndividual ();
+
+Family * initializeFamily ();
+
+GEDCOMerror parserDistributor (GEDCOMobject * obj, container allInformation, List * sendList, List * recieveList);
+
+GEDCOMerror headParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList);
+
+GEDCOMerror submitterParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList);
+
+GEDCOMerror individualParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList);
+
+GEDCOMerror familyParser (GEDCOMobject * obj, tagList * tagInformation, int * currentLocation, List * sendList, List * recieveList);
+
+Field * initializeField ();
+
+void dummyDelete(void* toBeDeleted);
+
+int dummyCompare(const void* first,const void* second);
+
+char* dummyPrint(void* toBePrinted);
+
+int compareAddress(const void* first,const void* second);
+
+addressInformation * createAddress (List * listPointer, Submitter ** submitterPointer, Individual ** spousePointer, char * address, void * initializedPointer, int count);
+
+bool checkIndividualEvent (char * tag);
+
+bool checkFamilyEvent (char * tag);
+
+Event * initializeEvent ();
 
 #endif

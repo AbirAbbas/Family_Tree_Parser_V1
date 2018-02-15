@@ -8,7 +8,7 @@ int main () {
 	
 	GEDCOMobject * obj = NULL;
 	
-	GEDCOMerror e = createGEDCOM("nonASCIIEncoded.ged", &(obj));
+	GEDCOMerror e = createGEDCOM("shakespeare.ged", &(obj));
 	
 	printf("%s", printError(e));
 	

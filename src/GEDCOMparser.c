@@ -43,11 +43,7 @@ GEDCOMerror createGEDCOM(char* fileName, GEDCOMobject** obj) {
 	container c;
 	c.t = allTags;
 	c.size = *size;
-	
-	for (int i = 0; i < *size; i++) {
-		printf("Length : %d, Level : %s, Tag : %s, Address : %s, Value : %s\n", allTags[i].length, allTags[i].level, allTags[i].tag, allTags[i].senderAddress, allTags[i].value);
-	}
-	
+		
 	GEDCOMerror e = checkForError(c.t, c.size);
 	
 	if (e.type == OK) {
@@ -56,20 +52,37 @@ GEDCOMerror createGEDCOM(char* fileName, GEDCOMobject** obj) {
 	else {
 		return e;
 	}
+	
+	List * recieveList = malloc(sizeof(List));
+	List * sendList = malloc(sizeof(List));
+	
+	*recieveList = initializeList(dummyPrint, dummyDelete, compareAddress);
+	*sendList = initializeList(dummyPrint, dummyDelete, compareAddress);
+	
+	obj = initObject(obj);	
+	e = parserDistributor(*obj, c, sendList, recieveList);
+	
+	if (e.type == OK) {
+		
+	}
+	else {
+		return e;
+	}	
+		
+		
+		
 		
 	//after it is done being used
 	freeTaglist(allTags, *size);
 	free(size);
-	obj = initObject(obj);
 	
 	//temporary!
-	(*obj)->header = malloc(sizeof(Header));
-	(*obj)->header->encoding = ANSEL;
 	fclose(inFile);
 
 	return createError((ErrorCode)OK, -1);
 	
 }
+
 
 char* printGEDCOM(const GEDCOMobject* obj) {
 	
